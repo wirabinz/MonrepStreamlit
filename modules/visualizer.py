@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from IPython.display import display
 from matplotlib.ticker import MaxNLocator, FuncFormatter
 
 class TaigaVisualizer:
@@ -117,7 +116,7 @@ class TaigaVisualizer:
         self._add_labels(ax, is_horizontal=True)
         self._apply_modern_style(ax)
         plt.title('Status Distribusi', pad=20, weight='bold')
-        plt.show()
+        
 
     def plot_priority_pie(self):
         plt.figure(figsize=(7, 7))
@@ -148,7 +147,7 @@ class TaigaVisualizer:
                    bbox_to_anchor=(1, 0, 0.5, 1), frameon=False)
 
         plt.title('Prioritas Pekerjaan', weight='bold', pad=20)
-        plt.show()
+        
 
     def show_performance_table(self):
         perf = self.df.groupby('Assigned To').agg({
@@ -168,7 +167,7 @@ class TaigaVisualizer:
         display_df = perf.drop(columns=['In progress_mins'])
         
         print("\n📊 LAPORAN PERFORMA PERSONIL")
-        display(display_df.sort_values('Total Unit Pekerjaan', ascending=False))
+        # display(display_df.sort_values('Total Unit Pekerjaan', ascending=False))
 
     def plot_priority_mix_stacked(self):
         plt.figure(figsize=(12, 6))
@@ -183,7 +182,7 @@ class TaigaVisualizer:
         self._apply_modern_style(plt.gca())
         plt.title('Komposisi Prioritas per Personil', pad=20, weight='bold')
         plt.legend(title='Priority', bbox_to_anchor=(1.05, 1), loc='upper left', frameon=False)
-        plt.show()
+        
 
     def plot_efficiency_by_priority(self):
             """Menampilkan rata-rata waktu per unit berdasarkan prioritas dengan gaya modern"""
@@ -207,7 +206,7 @@ class TaigaVisualizer:
             
             plt.title('Rata-rata Waktu per Unit Pekerjaan', pad=20, weight='bold')
             plt.ylabel('Durasi (Jam & Menit)')
-            plt.show()
+            
     
     def plot_bottleneck_analysis(self):
         """Analisis Bottleneck untuk setiap fase proses"""
@@ -235,7 +234,7 @@ class TaigaVisualizer:
         plt.title('Analisis Bottleneck: Rata-rata Waktu per Fase', pad=20, weight='bold')
         plt.ylabel('Durasi (Jam & Menit)')
         plt.xticks(rotation=0) # Tetap horizontal agar bersih
-        plt.show()
+        
 
     def plot_total_work_units(self):
         """The New Graph: Plotting 'Total Unit Pekerjaan' per Personnel"""
@@ -246,7 +245,7 @@ class TaigaVisualizer:
         self._apply_modern_style(ax)
         plt.title('Total Unit Pekerjaan (Poin) per Personil', pad=20, weight='bold')
         plt.xlabel('Jumlah Unit Pekerjaan')
-        plt.show()
+        
 
     def plot_connection_heatmap(self):
         """Visualizing the relationship between Project Type and Work Type"""
@@ -277,4 +276,4 @@ class TaigaVisualizer:
         
         # Modern cleanup: Remove tick marks
         plt.tick_params(axis='both', which='both', length=0)
-        plt.show()
+        

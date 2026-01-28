@@ -94,29 +94,23 @@ def main():
 
         with tab3:
             st.header("Personnel Performance & Velocity")
-            
-            # 1. Performance Table Calculation
-            # Aggregating base metrics
+
+            # Calculate performance metrics
             perf = viz.df.groupby('Assigned To').agg({
                 'ID': 'count',
                 'Points': 'sum',
                 'In progress_mins': 'sum'
             }).rename(columns={'ID': 'Jumlah Kartu', 'Points': 'Total Unit Pekerjaan'})
-            
-            # Applying formatting from visualizer logic
+
             perf['Total Durasi In Progress'] = perf['In progress_mins'].apply(viz._format_mins_to_dhm)
             perf['Efisiensi (Waktu/Unit)'] = (perf['In progress_mins'] / perf['Total Unit Pekerjaan']).apply(viz._format_mins_to_hm)
-            
-            # Adding the missing columns: Tipe Proyek and Tipe Pekerjaan
+
             perf['Tipe Proyek'] = viz.df.groupby('Assigned To')['Project Type'].apply(lambda x: ', '.join(x.unique()))
             perf['Tipe Pekerjaan'] = viz.df.groupby('Assigned To')['Work Type'].apply(lambda x: ', '.join(x.unique()))
-            
+
             st.subheader("📊 Laporan Performa Personil")
-            # Display sorted table without the raw minutes column
-            st.dataframe(
-                perf.drop(columns=['In progress_mins']).sort_values('Total Unit Pekerjaan', ascending=False), 
-                use_container_width=True
-            )
+            # Streamlit natively handles the display of dataframes
+            st.dataframe(perf.drop(columns=['In progress_mins']).sort_values('Total Unit Pekerjaan', ascending=False), use_container_width=True)
 
             # 2. Velocity & Mix Prioritas (Stacked vertically for larger view)
             st.markdown("---")
