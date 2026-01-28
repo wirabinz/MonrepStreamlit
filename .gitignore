@@ -1,4 +1,10 @@
-.streamlit/
+# Ignore the specific secrets file (Crucial for security!)
+.streamlit/secrets.toml
+
+# Do NOT ignore the config file (Crucial for theme/UI settings!)
+!.streamlit/config.toml
+
+# Keep ignoring other sensitive or junk files
 .env
 __pycache__/
 *.xlsx
