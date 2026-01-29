@@ -16,17 +16,23 @@ from visualizer import TaigaVisualizer
 st.set_page_config(page_title="Taiga Monitor Report", layout="wide")
 
 # --- DATA CACHING ---
-@st.cache_resource
+@st.cache_resource(ttl=3600) 
 def init_connection():
     auth = TaigaAuth()
-    if auth.login():
-        project = auth.get_project()
-        maps = auth.get_maps()
-        return auth.api, project, maps
+    try:
+        if auth.login():
+            project = auth.get_project()
+            maps = auth.get_maps()
+            return auth.api, project, maps
+    except Exception as e:
+        # This will help catch if the API returns HTML instead of JSON
+        st.error(f"Critical Connection Error: {e}")
     return None, None, None
 
 @st.cache_data(ttl=600)
 def load_data(_api, _project, _maps):
+    # If the API token is dead, this call will fail. 
+    # Because we added a TTL to init_connection, _api should be fresh.
     fetcher = TaigaFetcher(_api, _project, _maps)
     return fetcher.get_all_stories()
 
