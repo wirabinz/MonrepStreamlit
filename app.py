@@ -25,8 +25,10 @@ def init_connection():
             maps = auth.get_maps()
             return auth.api, project, maps
     except Exception as e:
-        # This will help catch if the API returns HTML instead of JSON
-        st.error(f"Critical Connection Error: {e}")
+        # If the server returns HTML (login page), this catches the parse error
+        st.error("Session expired or API unavailable. Re-authenticating...")
+        # Clear cache programmatically if needed
+        st.cache_resource.clear() 
     return None, None, None
 
 @st.cache_data(ttl=600)
