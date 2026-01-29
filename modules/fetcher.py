@@ -39,9 +39,10 @@ class TaigaFetcher:
         
         # 1. Extract Tag Categories
         priority = self._extract_tag(tags, 'priority')
-        project_type = self._extract_tag(tags, 'project')
+        project_type = self._extract_tag(tags, 'project_type')
         work_type = self._extract_tag(tags, 'work')
-        
+        project_name = self._extract_tag(tags, 'project_name')
+
         # 2. Get durations from processor
         durations = self.processor.analyze_time(history_entries)
         
@@ -70,6 +71,7 @@ class TaigaFetcher:
             'ID': getattr(story, 'id', None),
             'Ref': f"#{getattr(story, 'ref', 'N/A')}",
             'Subject': getattr(story, 'subject', 'No Subject'),
+            'Project': project_name,
             'Status': self._get_status_name(story),
             'Created Date': getattr(story, 'created_date', None),
             'Assigned To': ', '.join(assigned_names) if assigned_names else 'Unassigned',
@@ -83,13 +85,14 @@ class TaigaFetcher:
         return result
 
     def _extract_tag(self, tags, category):
-        """Corrected tag extraction with category scoping"""
+        """Modified tag extraction to support the new Project color #D351CF."""
         if not tags:
             return "Not specified"
 
         priority_keywords = {'urgent', 'moderate', 'low'}
         WORK_COLOR = '#51CFD3'
-        PROJECT_COLOR = '#5178D3'
+        PROJECT_TYPE_COLOR = '#5178D3'
+        PROJECT_NAME_COLOR = '#D351CF' # New Color Mapping
 
         for tag in tags:
             if tag is None: continue
@@ -100,11 +103,14 @@ class TaigaFetcher:
                 
                 if category == 'priority' and label.lower() in priority_keywords:
                     return label.lower()
-                elif category == 'project' and color == PROJECT_COLOR:
+                elif category == 'project_type' and color == PROJECT_TYPE_COLOR:
                     return label
                 elif category == 'work' and color == WORK_COLOR:
                     return label
+                elif category == 'project_name' and color == PROJECT_NAME_COLOR: # New Feature
+                    return label
             else:
+                # Support for string-based tags like "project_name:MyProject"
                 tag_str = str(tag).lower()
                 if f"{category.lower()}:" in tag_str:
                     parts = str(tag).split(':', 1)

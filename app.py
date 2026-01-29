@@ -89,6 +89,31 @@ def main():
                 st.pyplot(plt.gcf())
                 plt.clf()
 
+            st.markdown("---")
+            st.header("📌 Project Assignment Matrix")
+
+            # Call the new method
+            fig, report_df = viz.plot_project_assignment_matrix()
+
+            if fig:
+                # Display the Card Volume Graph
+                st.pyplot(fig)
+                plt.clf()
+
+                # Display the Individual Project Tables in an Expander or List
+                st.subheader("📋 Project Assignment Details")
+                
+                # Group by Project and show tables
+                projects = report_df['Project'].unique()
+                for project_name in projects:
+                    with st.expander(f"Project: {project_name}"):
+                        group = report_df[report_df['Project'] == project_name]
+                        # Sort by status order defined previously
+                        st.table(group[['Subject', 'Assigned To', 'Status']].sort_values('Status'))
+            else:
+                st.warning("⚠️ 'Project' column missing. Please clear cache and re-fetch data.")
+
+
         with tab2:
             st.header("Efficiency, Bottleneck & Work Connections")
             

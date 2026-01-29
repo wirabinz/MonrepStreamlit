@@ -83,6 +83,8 @@ class TaigaVisualizer:
         self.df['Project Type'] = self.df['Project Type'].apply(self._clean_text)
         self.df['Work Type'] = self.df['Work Type'].apply(self._clean_text)
         self.df['Points'] = pd.to_numeric(self.df['Points'], errors='coerce').fillna(1).replace(0, 1)
+        if 'Project' in self.df.columns:
+            self.df['Project'] = self.df['Project'].apply(self._clean_text)
 
         for status in self.target_statuses:
             col_mins = f'{status}_mins'
@@ -276,4 +278,42 @@ class TaigaVisualizer:
         
         # Modern cleanup: Remove tick marks
         plt.tick_params(axis='both', which='both', length=0)
-        
+
+    def plot_project_assignment_matrix(self):
+        """Modified for Streamlit compatibility"""
+        if 'Project' not in self.df.columns:
+            return None, None # Return empty values if column is missing
+
+        # 1. Prepare and Sort Data
+        report_df = self.df[['Project', 'Subject', 'Assigned To', 'Status']].copy()
+        report_df['Project'] = report_df['Project'].replace({
+            'Not specified': 'Various Projects',
+            'not specified': 'Various Projects',
+            'Not Specified': 'Various Projects'
+        })
+
+        # 2. Define the exact Status order
+        status_order = ['To Do', 'In progress', 'Peer Review', 'Approved', 'Submitted']
+        report_df['Status'] = pd.Categorical(report_df['Status'], categories=status_order, ordered=True)
+
+        # --- PART A: The Plotting ---
+        fig = plt.figure(figsize=(12, 6))
+        ax = sns.countplot(data=report_df, x='Project', hue='Status', hue_order=status_order, palette='pastel')
+
+        for p in ax.patches:
+            height = p.get_height()
+            if height > 0:
+                ax.annotate(f'{int(height)}', 
+                            (p.get_x() + p.get_width() / 2., height), 
+                            ha='center', va='bottom', 
+                            xytext=(0, 5), textcoords='offset points',
+                            fontsize=9, color='#555555')
+
+        self._apply_modern_style(ax)
+        plt.title('Card Volume per Project & Status', pad=25, weight='bold')
+        plt.ylabel('Number of Cards')
+        plt.legend(title='Status', bbox_to_anchor=(1.05, 1), loc='upper left', frameon=False)
+
+        # --- PART B: Return values for Streamlit ---
+        # We return the dataframe grouped by project for the tables in app.py
+        return fig, report_df
