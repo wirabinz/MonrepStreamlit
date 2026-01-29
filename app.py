@@ -158,6 +158,14 @@ def main():
             st.subheader("📊 Laporan Performa Personil")
             # Streamlit natively handles the display of dataframes
             st.dataframe(perf.drop(columns=['In progress_mins']).sort_values('Total Unit Pekerjaan', ascending=False), use_container_width=True)
+            
+            # --- NEW: Efficiency Heatmap ---
+            st.markdown("---")
+            st.subheader("🌡️ Heatmap Efisiensi (Waktu per Poin)")
+            st.info("Heatmap ini menunjukkan rata-rata waktu yang dihabiskan per 1 unit poin pekerjaan.")
+            fig_heatmap = viz.plot_bottleneck_heatmap()
+            st.pyplot(fig_heatmap, use_container_width=True)
+            plt.clf()
 
             # 2. Velocity & Mix Prioritas (Stacked vertically for larger view)
             st.markdown("---")

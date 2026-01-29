@@ -317,3 +317,80 @@ class TaigaVisualizer:
         # --- PART B: Return values for Streamlit ---
         # We return the dataframe grouped by project for the tables in app.py
         return fig, report_df
+    
+    def plot_personnel_bottleneck_comparison(self):
+        """Analisis Bottleneck per Personil dalam satu grafik"""
+        # Maintain your existing logic...
+        plt.figure(figsize=(14, 7))
+        status_cols = [f'{s}_mins' for s in self.target_statuses]
+        melted_df = self.df.melt(
+            id_vars=['Assigned To'], 
+            value_vars=status_cols, 
+            var_name='Status', 
+            value_name='Minutes'
+        )
+        melted_df['Status'] = melted_df['Status'].str.replace('_mins', '')
+        
+        ax = sns.barplot(
+            data=melted_df, 
+            x='Assigned To', 
+            y='Minutes', 
+            hue='Status', 
+            hue_order=self.target_statuses,
+            palette='pastel',
+            errorbar=None
+        )
+        
+        self._apply_modern_style(ax)
+        ax.yaxis.set_major_formatter(FuncFormatter(self._format_mins_to_hm))
+        
+        plt.title('Perbandingan Bottleneck Antar Personil (Rata-rata Waktu)', pad=25, weight='bold')
+        plt.ylabel('Durasi (Jam & Menit)')
+        plt.xlabel('Nama Personil')
+        plt.xticks(rotation=45)
+        plt.legend(title='Fase Kerja', bbox_to_anchor=(1.05, 1), loc='upper left', frameon=False)
+        plt.tight_layout()
+        
+        return plt.gcf() # RETURN instead of plt.show()
+
+    def plot_bottleneck_heatmap(self):
+        """Efficiency Heatmap: Rata-rata menit per Unit Poin (Minutes per Point)."""
+        # Maintain your existing logic...
+        plt.figure(figsize=(14, 8))
+        status_cols = [f'{s}_mins' for s in self.target_statuses]
+        agg_data = self.df.groupby('Assigned To').agg({
+            'Points': 'sum',
+            **{col: 'sum' for col in status_cols}
+        })
+        
+        efficiency_data = pd.DataFrame(index=agg_data.index)
+        for s in self.target_statuses:
+            efficiency_data[s] = agg_data[f'{s}_mins'] / agg_data['Points'].replace(0, 1)
+        
+        ax = sns.heatmap(
+            efficiency_data, 
+            annot=True, 
+            fmt=".1f", 
+            cmap="coolwarm", 
+            cbar_kws={'label': 'Menit per Unit Poin'},
+            linewidths=0.5,
+            annot_kws={"size": 10}
+        )
+        
+        for text in ax.texts:
+            try:
+                val = float(text.get_text())
+                if val > 0:
+                    text.set_text(self._format_mins_to_hm(val))
+                else:
+                    text.set_text("-")
+            except ValueError:
+                continue
+
+        plt.title('Heatmap Efisiensi: Waktu per Unit Pekerjaan ', pad=25, weight='bold', fontsize=16)
+        plt.xlabel('Fase Kerja', labelpad=15)
+        plt.ylabel('Nama Personil', labelpad=15)
+        plt.tick_params(axis='both', which='both', length=0)
+        plt.tight_layout()
+        
+        return plt.gcf() # RETURN instead of plt.show()
