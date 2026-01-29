@@ -16,20 +16,34 @@ from visualizer import TaigaVisualizer
 st.set_page_config(page_title="Taiga Monitor Report", layout="wide")
 
 # --- DATA CACHING ---
+# --- In app.py ---
+import streamlit as st
+from modules.auth import TaigaAuth
+
+# Use @st.cache_resource for objects that shouldn't be duplicated (sessions/connections)
+# Added ttl=3600 to force a refresh every hour in case of silent token expiry
 @st.cache_resource(ttl=3600) 
 def init_connection():
     auth = TaigaAuth()
     try:
         if auth.login():
+            # Get the resources you'll use throughout the app
             project = auth.get_project()
             maps = auth.get_maps()
             return auth.api, project, maps
     except Exception as e:
-        # If the server returns HTML (login page), this catches the parse error
-        st.error("Session expired or API unavailable. Re-authenticating...")
-        # Clear cache programmatically if needed
-        st.cache_resource.clear() 
+        # Catch errors where the API might return an HTML login page instead of JSON
+        st.error(f"Authentication session error: {e}")
+        # Programmatically clear this function's cache so it retries next time
+        init_connection.clear()
     return None, None, None
+
+# Usage in your main app flow:
+api, project, maps = init_connection()
+
+if api is None:
+    st.warning("Failed to connect to Taiga. Please check your credentials or wait a moment.")
+    st.stop()
 
 @st.cache_data(ttl=600)
 def load_data(_api, _project, _maps):
