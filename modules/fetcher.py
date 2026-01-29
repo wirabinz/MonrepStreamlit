@@ -2,6 +2,7 @@
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor # New import for speed
 from modules.processor import TaigaProcessor
+import time
 
 class TaigaFetcher:
     def __init__(self, api, project, maps):
@@ -18,6 +19,7 @@ class TaigaFetcher:
         """Helper function to fetch history and extract data for one story."""
         # This part runs in parallel for multiple stories
         history_entries = self.api.history.user_story.get(story.id)
+        time.sleep(0.1) 
         return self._extract_story_data(story, history_entries)
 
     def get_all_stories(self):
@@ -26,7 +28,7 @@ class TaigaFetcher:
         
         # Use ThreadPoolExecutor to fetch history for stories in parallel
         # Adjust max_workers based on your internet/server capacity (5-10 is usually safe)
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             results = list(executor.map(self.fetch_single_story_data, stories))
         
         return pd.DataFrame(results)
