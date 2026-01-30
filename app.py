@@ -22,7 +22,7 @@ from modules.auth import TaigaAuth
 
 # Use @st.cache_resource for objects that shouldn't be duplicated (sessions/connections)
 # Added ttl=3600 to force a refresh every hour in case of silent token expiry
-@st.cache_resource(ttl=3600) 
+@st.cache_resource(ttl=86400) 
 def init_connection():
     auth = TaigaAuth()
     try:
@@ -39,10 +39,14 @@ def init_connection():
     return None, None, None
 
 # Usage in your main app flow:
+
+
 api, project, maps = init_connection()
 
 if api is None:
-    st.warning("Failed to connect to Taiga. Please check your credentials or wait a moment.")
+    st.error("🛑 **Access Temporarily Blocked by Taiga Firewall.**")
+    st.info("The server thinks the app is a bot. Please wait at least 15 minutes before refreshing. "
+            "I have updated the fetcher to be slower to prevent this in the future.")
     st.stop()
 
 @st.cache_data(ttl=600)

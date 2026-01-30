@@ -1,6 +1,6 @@
 # modules/fetcher.py
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor # New import for speed
+# from concurrent.futures import ThreadPoolExecutor # New import for speed
 from modules.processor import TaigaProcessor
 import time
 
@@ -22,15 +22,37 @@ class TaigaFetcher:
         time.sleep(0.1) 
         return self._extract_story_data(story, history_entries)
 
+    # def get_all_stories(self):
+    #     """Get all user stories as DataFrame using parallel fetching."""
+    #     stories = self.api.user_stories.list(project=self.project.id, pagination=False)
+        
+    #     # Use ThreadPoolExecutor to fetch history for stories in parallel
+    #     # Adjust max_workers based on your internet/server capacity (5-10 is usually safe)
+    #     with ThreadPoolExecutor(max_workers=3) as executor:
+    #         results = list(executor.map(self.fetch_single_story_data, stories))
+        
+        # return pd.DataFrame(results)
+    
+
     def get_all_stories(self):
-        """Get all user stories as DataFrame using parallel fetching."""
         stories = self.api.user_stories.list(project=self.project.id, pagination=False)
-        
-        # Use ThreadPoolExecutor to fetch history for stories in parallel
-        # Adjust max_workers based on your internet/server capacity (5-10 is usually safe)
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            results = list(executor.map(self.fetch_single_story_data, stories))
-        
+
+        results = []
+        # Progress bar for the UI so you don't think it's stuck
+        progress_text = "Fetching data safely to avoid firewall blocks..."
+        my_bar = st.progress(0, text=progress_text)
+
+        for i, story in enumerate(stories):
+            # Sequential fetching with a generous 0.5s pause
+            time.sleep(0.5) 
+            data = self.fetch_single_story_data(story)
+            results.append(data)
+
+            # Update progress bar
+            progress = (i + 1) / len(stories)
+            my_bar.progress(progress, text=f"{progress_text} ({i+1}/{len(stories)})")
+
+        my_bar.empty() # Remove bar when done
         return pd.DataFrame(results)
     
     def _extract_story_data(self, story, history_entries):
