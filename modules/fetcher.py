@@ -1,4 +1,4 @@
-# modules/fetcher.py
+import streamlit as st
 import pandas as pd
 # from concurrent.futures import ThreadPoolExecutor # New import for speed
 from modules.processor import TaigaProcessor
