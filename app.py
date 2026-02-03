@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sys
 import os
+import time
 
 # Ensure modules folder is in path
 module_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "modules"))
@@ -16,32 +17,43 @@ from visualizer import TaigaVisualizer
 st.set_page_config(page_title="Taiga Monitor Report", layout="wide")
 
 # --- CONNECTION CACHING ---
-@st.cache_resource(ttl=3600) # Reduced to 1 hour to stay safe with token expiry
+@st.cache_resource(ttl=3600)
 def init_connection():
+    # Check if we were recently blocked to avoid spamming the API
+    if "last_block_time" in st.session_state:
+        # If blocked less than 15 mins ago, don't even try
+        if time.time() - st.session_state["last_block_time"] < 900:
+            return None, None, None
+
     auth = TaigaAuth()
     try:
         if auth.login():
             project = auth.get_project()
             maps = auth.get_maps()
-            # Double check the connection works before returning
-            auth.api.me() 
+            # Perform a verified check
+            auth.api.me()
             return auth.api, project, maps
     except Exception as e:
-        # If we see the HTML robot page or a 401, clear cache instantly
+        if "<html>" in str(e).lower() or "waiting for the redirection" in str(e).lower():
+            st.session_state["last_block_time"] = time.time()
         init_connection.clear()
-        return None, None, None
+    return None, None, None
 
 # --- DATA FETCHING ---
 def fetch_fresh_data(api, project, maps):
-    """Pulls new data, but first verifies the session is still alive."""
+    """Pulls new data with extreme caution."""
     try:
-        # Step 1: "Heartbeat" check - try a tiny API call
+        # Brief pause to 'cool down' before the first API call
+        time.sleep(2) 
         api.me() 
-    except Exception:
-        # Step 2: If heartbeat fails, the token is likely expired.
-        # Clear the connection cache and force the user to re-run
+    except Exception as e:
+        if "<html>" in str(e).lower():
+            st.error("🛑 **Firewall Redirection Detected.**")
+            st.info("The server is challenging the connection. Please close this tab and wait 15 minutes.")
+            st.session_state["last_block_time"] = time.time()
+            st.stop()
+        
         st.cache_resource.clear()
-        st.error("🔄 **Session Expired.** Re-authenticating... Please click 'Sync' again.")
         st.rerun()
 
     fetcher = TaigaFetcher(api, project, maps)
