@@ -61,7 +61,6 @@ def main():
         # 3. Check if we have data to display
         if st.session_state['df_raw'] is None:
             st.warning("No data loaded. Please click 'Sync Data from Taiga' in the sidebar to begin.")
-            st.info("The first sync will take longer as it bypasses the firewall safely.")
             st.stop()
         
         # Use the data stored in session state
