@@ -16,22 +16,34 @@ from visualizer import TaigaVisualizer
 st.set_page_config(page_title="Taiga Monitor Report", layout="wide")
 
 # --- CONNECTION CACHING ---
-@st.cache_resource(ttl=86400) 
+@st.cache_resource(ttl=3600) # Reduced to 1 hour to stay safe with token expiry
 def init_connection():
     auth = TaigaAuth()
     try:
         if auth.login():
             project = auth.get_project()
             maps = auth.get_maps()
+            # Double check the connection works before returning
+            auth.api.me() 
             return auth.api, project, maps
     except Exception as e:
-        st.error(f"Authentication session error: {e}")
+        # If we see the HTML robot page or a 401, clear cache instantly
         init_connection.clear()
-    return None, None, None
+        return None, None, None
 
 # --- DATA FETCHING ---
 def fetch_fresh_data(api, project, maps):
-    """Bypasses cache to pull new data from Taiga."""
+    """Pulls new data, but first verifies the session is still alive."""
+    try:
+        # Step 1: "Heartbeat" check - try a tiny API call
+        api.me() 
+    except Exception:
+        # Step 2: If heartbeat fails, the token is likely expired.
+        # Clear the connection cache and force the user to re-run
+        st.cache_resource.clear()
+        st.error("🔄 **Session Expired.** Re-authenticating... Please click 'Sync' again.")
+        st.rerun()
+
     fetcher = TaigaFetcher(api, project, maps)
     return fetcher.get_all_stories()
 
