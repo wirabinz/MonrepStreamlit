@@ -71,5 +71,8 @@ class TaigaAuth:
 
     def get_maps(self):
         if not self.project: return {}
-        member_map = {m.id: m.full_name for m in self.project.members}
-        return {'members': member_map}
+        # Only fetch if not already in memory to save API calls
+        if not hasattr(self, '_cached_maps'):
+            member_map = {m.id: m.full_name for m in self.project.members}
+            self._cached_maps = {'members': member_map}
+        return self._cached_maps

@@ -15,45 +15,24 @@ from visualizer import TaigaVisualizer
 
 st.set_page_config(page_title="Taiga Monitor Report", layout="wide")
 
-# --- DATA CACHING ---
-# --- In app.py ---
-import streamlit as st
-from modules.auth import TaigaAuth
-
-# Use @st.cache_resource for objects that shouldn't be duplicated (sessions/connections)
-# Added ttl=3600 to force a refresh every hour in case of silent token expiry
+# --- CONNECTION CACHING ---
 @st.cache_resource(ttl=86400) 
 def init_connection():
     auth = TaigaAuth()
     try:
         if auth.login():
-            # Get the resources you'll use throughout the app
             project = auth.get_project()
             maps = auth.get_maps()
             return auth.api, project, maps
     except Exception as e:
-        # Catch errors where the API might return an HTML login page instead of JSON
         st.error(f"Authentication session error: {e}")
-        # Programmatically clear this function's cache so it retries next time
         init_connection.clear()
     return None, None, None
 
-# Usage in your main app flow:
-
-
-api, project, maps = init_connection()
-
-if api is None:
-    st.error("🛑 **Access Temporarily Blocked by Taiga Firewall.**")
-    st.info("The server thinks the app is a bot. Please wait at least 15 minutes before refreshing. "
-            "I have updated the fetcher to be slower to prevent this in the future.")
-    st.stop()
-
-@st.cache_data(ttl=600)
-def load_data(_api, _project, _maps):
-    # If the API token is dead, this call will fail. 
-    # Because we added a TTL to init_connection, _api should be fresh.
-    fetcher = TaigaFetcher(_api, _project, _maps)
+# --- DATA FETCHING ---
+def fetch_fresh_data(api, project, maps):
+    """Bypasses cache to pull new data from Taiga."""
+    fetcher = TaigaFetcher(api, project, maps)
     return fetcher.get_all_stories()
 
 def main():
@@ -64,13 +43,33 @@ def main():
     if api:
         st.sidebar.success(f"Connected to: {project.name}")
         
-        # Load Data
-        with st.spinner("Fetching data from Taiga..."):
-            df_raw = load_data(api, project, maps)
+        # --- NEW: MANUAL SYNC STRATEGY ---
+        st.sidebar.header("🔄 Data Management")
         
+        # 1. Initialize session state for data if it doesn't exist
+        if 'df_raw' not in st.session_state:
+            st.session_state['df_raw'] = None
+
+        # 2. Add Sync Button
+        if st.sidebar.button("Sync Data from Taiga"):
+            with st.spinner("Fetching data safely (this may take a minute)..."):
+                # Call the fetcher directly (make sure your fetcher has the 1.0s sleep!)
+                new_data = fetch_fresh_data(api, project, maps)
+                st.session_state['df_raw'] = new_data
+                st.sidebar.success("✅ Data Synced!")
+
+        # 3. Check if we have data to display
+        if st.session_state['df_raw'] is None:
+            st.warning("No data loaded. Please click 'Sync Data from Taiga' in the sidebar to begin.")
+            st.info("The first sync will take longer as it bypasses the firewall safely.")
+            st.stop()
+        
+        # Use the data stored in session state
+        df_raw = st.session_state['df_raw']
+        # --- END SYNC STRATEGY ---
+
         # Filters in Sidebar
         st.sidebar.header("Filters")
-        # Set default to Jan-Jan (1to1) and Year 2026 as per your Jupyter notebook
         month_val = st.sidebar.slider("Month Range", 1, 12, (1, 1))
         month_filter = f"{month_val[0]}to{month_val[1]}"
         
@@ -86,7 +85,7 @@ def main():
                 st.subheader("Status Distribution")
                 viz.plot_status_distribution()
                 st.pyplot(plt.gcf())
-                plt.clf() # Clear figure for next plot
+                plt.clf() 
             with col2:
                 st.subheader("Prioritas Pekerjaan")
                 viz.plot_priority_pie()
@@ -95,49 +94,31 @@ def main():
 
             st.markdown("---")
             st.header("📌 Project Assignment Matrix")
-
-            # Call the new method
             fig, report_df = viz.plot_project_assignment_matrix()
-
             if fig:
-                # Display the Card Volume Graph
                 st.pyplot(fig)
                 plt.clf()
-
-                # Display the Individual Project Tables in an Expander or List
                 st.subheader("📋 Project Assignment Details")
-                
-                # Group by Project and show tables
                 projects = report_df['Project'].unique()
                 for project_name in projects:
                     with st.expander(f"Project: {project_name}"):
                         group = report_df[report_df['Project'] == project_name]
-                        # Sort by status order defined previously
                         st.table(group[['Subject', 'Assigned To', 'Status']].sort_values('Status'))
             else:
-                st.warning("⚠️ 'Project' column missing. Please clear cache and re-fetch data.")
-
+                st.warning("⚠️ 'Project' column missing. Click 'Sync Data' to refresh.")
 
         with tab2:
             st.header("Efficiency, Bottleneck & Work Connections")
-            
-            # 1. Heatmap: Relationship between Project Type and Work Type
             st.subheader("Koneksi: Tipe Proyek vs Tipe Pekerjaan")
             viz.plot_connection_heatmap()
             st.pyplot(plt.gcf(), use_container_width=True)
-            plt.clf()  # Clear the figure for the next plot
-            
+            plt.clf() 
             st.markdown("---")
-            
-            # 2. Efficiency by Priority
             st.subheader("Efficiency by Priority")
             viz.plot_efficiency_by_priority()
             st.pyplot(plt.gcf(), use_container_width=True)
             plt.clf()
-            
             st.markdown("---")
-            
-            # 3. Bottleneck Analysis
             st.subheader("Bottleneck Analysis (Avg Time per Phase)")
             viz.plot_bottleneck_analysis()
             st.pyplot(plt.gcf(), use_container_width=True)
@@ -145,8 +126,6 @@ def main():
 
         with tab3:
             st.header("Personnel Performance & Velocity")
-
-            # Calculate performance metrics
             perf = viz.df.groupby('Assigned To').agg({
                 'ID': 'count',
                 'Points': 'sum',
@@ -155,23 +134,18 @@ def main():
 
             perf['Total Durasi In Progress'] = perf['In progress_mins'].apply(viz._format_mins_to_dhm)
             perf['Efisiensi (Waktu/Unit)'] = (perf['In progress_mins'] / perf['Total Unit Pekerjaan']).apply(viz._format_mins_to_hm)
-
             perf['Tipe Proyek'] = viz.df.groupby('Assigned To')['Project Type'].apply(lambda x: ', '.join(x.unique()))
             perf['Tipe Pekerjaan'] = viz.df.groupby('Assigned To')['Work Type'].apply(lambda x: ', '.join(x.unique()))
 
             st.subheader("📊 Laporan Performa Personil")
-            # Streamlit natively handles the display of dataframes
             st.dataframe(perf.drop(columns=['In progress_mins']).sort_values('Total Unit Pekerjaan', ascending=False), use_container_width=True)
             
-            # --- NEW: Efficiency Heatmap ---
             st.markdown("---")
             st.subheader("🌡️ Heatmap Efisiensi (Waktu per Poin)")
-            st.info("Heatmap ini menunjukkan rata-rata waktu yang dihabiskan per 1 unit poin pekerjaan.")
             fig_heatmap = viz.plot_bottleneck_heatmap()
             st.pyplot(fig_heatmap, use_container_width=True)
             plt.clf()
 
-            # 2. Velocity & Mix Prioritas (Stacked vertically for larger view)
             st.markdown("---")
             st.subheader("Priority Mix per Personnel")
             viz.plot_priority_mix_stacked()
@@ -185,7 +159,9 @@ def main():
             plt.clf()
 
     else:
-        st.error("Could not establish connection. Check your environment variables file.")
+        st.error("🛑 **Access Temporarily Blocked by Taiga Firewall.**")
+        st.info("Please wait at least 15 minutes. The firewall detected too many requests.")
+        st.stop()
 
 if __name__ == "__main__":
     main()

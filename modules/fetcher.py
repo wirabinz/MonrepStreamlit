@@ -36,23 +36,18 @@ class TaigaFetcher:
 
     def get_all_stories(self):
         stories = self.api.user_stories.list(project=self.project.id, pagination=False)
-
         results = []
-        # Progress bar for the UI so you don't think it's stuck
-        progress_text = "Fetching data safely to avoid firewall blocks..."
-        my_bar = st.progress(0, text=progress_text)
-
+        # Use a slower pace. 1.0 second is very safe for 34 cards.
+        # Total time: 34 seconds, but it won't crash your app for 12 hours.
+        my_bar = st.progress(0, text="Bypassing Firewall protection...")
+        
         for i, story in enumerate(stories):
-            # Sequential fetching with a generous 0.5s pause
-            time.sleep(0.5) 
+            time.sleep(1.0) # Human-like delay
             data = self.fetch_single_story_data(story)
             results.append(data)
-
-            # Update progress bar
-            progress = (i + 1) / len(stories)
-            my_bar.progress(progress, text=f"{progress_text} ({i+1}/{len(stories)})")
-
-        my_bar.empty() # Remove bar when done
+            my_bar.progress((i + 1) / len(stories))
+            
+        my_bar.empty()
         return pd.DataFrame(results)
     
     def _extract_story_data(self, story, history_entries):
