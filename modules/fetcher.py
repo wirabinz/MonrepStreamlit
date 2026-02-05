@@ -3,6 +3,7 @@ import pandas as pd
 # from concurrent.futures import ThreadPoolExecutor # New import for speed
 from modules.processor import TaigaProcessor
 import time
+import random
 
 class TaigaFetcher:
     def __init__(self, api, project, maps):
@@ -18,8 +19,7 @@ class TaigaFetcher:
     def fetch_single_story_data(self, story):
         """Helper function to fetch history and extract data for one story."""
         # This part runs in parallel for multiple stories
-        history_entries = self.api.history.user_story.get(story.id)
-        time.sleep(0.1) 
+        history_entries = self._safe_get_story_history(story.id)
         return self._extract_story_data(story, history_entries)
 
     # def get_all_stories(self):
@@ -49,6 +49,22 @@ class TaigaFetcher:
             
         my_bar.empty()
         return pd.DataFrame(results)
+
+    def _safe_get_story_history(self, story_id):
+        attempts = 0
+        while True:
+            try:
+                return self.api.history.user_story.get(story_id)
+            except Exception as e:
+                err = str(e).lower()
+                if "<html>" in err or "doctype" in err or "bitninja" in err:
+                    attempts += 1
+                    if attempts >= 3:
+                        raise Exception("firewall_blocked")
+                    backoff = min(10, 2 ** attempts) + random.random()
+                    time.sleep(backoff)
+                    continue
+                raise
     
     def _extract_story_data(self, story, history_entries):
         """Extract story data with clean integer points (default 1)"""

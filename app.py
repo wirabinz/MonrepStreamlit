@@ -16,48 +16,47 @@ from visualizer import TaigaVisualizer
 
 st.set_page_config(page_title="Taiga Monitor Report", layout="wide")
 
+# Shared, cross-session cooldown state
+@st.cache_resource
+def blocked_state():
+    return {"until": 0}
+
 # --- CONNECTION CACHING ---
 @st.cache_resource(ttl=3600)
 def init_connection():
-    # Check if we were recently blocked to avoid spamming the API
-    if "last_block_time" in st.session_state:
-        # If blocked less than 15 mins ago, don't even try
-        if time.time() - st.session_state["last_block_time"] < 900:
-            return None, None, None
+    # Check shared cooldown to avoid spamming the API
+    if blocked_state()["until"] > time.time():
+        return None, None, None
 
     auth = TaigaAuth()
     try:
         if auth.login():
             project = auth.get_project()
             maps = auth.get_maps()
-            # Perform a verified check
-            auth.api.me()
             return auth.api, project, maps
     except Exception as e:
         if "<html>" in str(e).lower() or "waiting for the redirection" in str(e).lower():
-            st.session_state["last_block_time"] = time.time()
+            blocked_state()["until"] = time.time() + 900
         init_connection.clear()
     return None, None, None
 
 # --- DATA FETCHING ---
 def fetch_fresh_data(api, project, maps):
     """Pulls new data with extreme caution."""
+    fetcher = TaigaFetcher(api, project, maps)
     try:
         # Brief pause to 'cool down' before the first API call
-        time.sleep(2) 
-        api.me() 
+        time.sleep(2)
+        return fetcher.get_all_stories()
     except Exception as e:
-        if "<html>" in str(e).lower():
-            st.error("🛑 **Firewall Redirection Detected.**")
+        if "firewall_blocked" in str(e).lower() or "<html>" in str(e).lower():
+            st.error("Firewall redirection detected.")
             st.info("The server is challenging the connection. Please close this tab and wait 15 minutes.")
-            st.session_state["last_block_time"] = time.time()
+            blocked_state()["until"] = time.time() + 900
             st.stop()
-        
+
         st.cache_resource.clear()
         st.rerun()
-
-    fetcher = TaigaFetcher(api, project, maps)
-    return fetcher.get_all_stories()
 
 def main():
     st.title("📊 Taiga Engineering Performance Dashboard")
