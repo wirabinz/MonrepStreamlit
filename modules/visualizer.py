@@ -280,42 +280,64 @@ class TaigaVisualizer:
         plt.tick_params(axis='both', which='both', length=0)
 
     def plot_project_assignment_matrix(self):
-        """Modified for Streamlit compatibility"""
+        """
+        Horizontal Bar Chart: Optimized for long project names and 
+        compact vertical space (narrower vertically).
+        """
         if 'Project' not in self.df.columns:
-            return None, None  # Return empty values if column is missing
-    
+            return None, None 
+
         # 1. Prepare and Sort Data
         report_df = self.df[['Project', 'Subject', 'Assigned To', 'Status']].copy()
+        
+        # Robust replacement for "Various Projects"
         report_df['Project'] = report_df['Project'].replace({
             'Not specified': 'Various Projects',
             'not specified': 'Various Projects',
             'Not Specified': 'Various Projects'
         })
-    
-        # 2. Define the exact Status order
+
         status_order = ['To Do', 'In progress', 'Peer Review', 'Approved', 'Submitted']
         report_df['Status'] = pd.Categorical(report_df['Status'], categories=status_order, ordered=True)
-    
-        # --- PART A: The Plotting ---
-        fig = plt.figure(figsize=(12, 8))  # Adjusted height for horizontal bars
-        ax = sns.countplot(data=report_df, y='Project', hue='Status', hue_order=status_order, palette='pastel')
-    
+        
+        # 2. Setup Plotting (Horizontal and Narrow)
+        n_projects = len(report_df['Project'].unique())
+        # Compact vertical scaling: multiplier reduced to 0.45 for a narrower profile
+        fig_height = max(3, n_projects * 0.45) 
+        
+        fig = plt.figure(figsize=(12, fig_height))
+        
+        # Use y='Project' for horizontal layout to accommodate long names
+        ax = sns.countplot(
+            data=report_df, 
+            y='Project', 
+            hue='Status', 
+            hue_order=status_order, 
+            palette='pastel'
+        )
+
+        # 3. Horizontal Annotations (Labels next to dots/bars)
         for p in ax.patches:
             width = p.get_width()
             if width > 0:
                 ax.annotate(f'{int(width)}', 
-                           (width, p.get_y() + p.get_height() / 2.), 
-                           ha='left', va='center', 
-                           xytext=(5, 0), textcoords='offset points',
-                           fontsize=9, color='#555555')
-    
+                            (width, p.get_y() + p.get_height() / 2.), 
+                            ha='left', va='center', 
+                            xytext=(5, 0), textcoords='offset points',
+                            fontsize=9, color='#555555', weight='semibold')
+
         self._apply_modern_style(ax)
-        plt.title('Card Volume per Project & Status', pad=25, weight='bold')
-        plt.xlabel('Number of Cards')  # Changed from plt.ylabel
-        plt.legend(title='Status', bbox_to_anchor=(1.05, 1), loc='upper left', frameon=False)
-    
-        # --- PART B: Return values for Streamlit ---
-        # We return the dataframe grouped by project for the tables in app.py
+        
+        # Cleanup for Apple-style: focus on labels instead of axis lines
+        ax.xaxis.set_visible(False) 
+        sns.despine(left=False, bottom=True)
+        
+        plt.title('Card Volume per Project & Status', pad=15, weight='bold', fontsize=12)
+        plt.ylabel('')
+        plt.legend(title='Status', bbox_to_anchor=(1.02, 1), loc='upper left', frameon=False, fontsize=9)
+        plt.tight_layout()
+
+        # --- PART B: Return values (Exact match for app.py) ---
         return fig, report_df
     
     def plot_personnel_bottleneck_comparison(self):
