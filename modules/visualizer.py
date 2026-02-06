@@ -297,7 +297,7 @@ class TaigaVisualizer:
             'Not Specified': 'Various Projects'
         })
 
-        status_order = ['To Do', 'In progress', 'Peer Review', 'Approved', 'Submitted']
+        status_order = ['To Do', 'In progress', 'Peer Review', 'Need Approval','Approved', 'Submitted']
         report_df['Status'] = pd.Categorical(report_df['Status'], categories=status_order, ordered=True)
         
         # 2. Setup Plotting (Horizontal and Narrow)
