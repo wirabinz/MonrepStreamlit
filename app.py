@@ -92,8 +92,17 @@ def main():
 
         # Filters in Sidebar
         st.sidebar.header("Filters")
-        month_val = st.sidebar.slider("Month Range", 1, 12, (1, 1))
-        month_filter = f"{month_val[0]}to{month_val[1]}"
+        month_labels = {
+            "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4,
+            "May": 5, "Jun": 6, "Jul": 7, "Aug": 8,
+            "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
+        }
+        selected_month_labels = st.sidebar.multiselect(
+            "Months",
+            options=list(month_labels.keys()),
+            default=["Jan"]
+        )
+        month_filter = [month_labels[m] for m in selected_month_labels]
         
         # Initialize Visualizer
         viz = TaigaVisualizer(df_raw, month=month_filter, year=2026)

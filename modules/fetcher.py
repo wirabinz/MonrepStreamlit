@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
-# from concurrent.futures import ThreadPoolExecutor # New import for speed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from modules.processor import TaigaProcessor
 import time
 import random
+import threading
 
 class TaigaFetcher:
     def __init__(self, api, project, maps):
@@ -15,6 +16,10 @@ class TaigaFetcher:
         # Fetch all statuses once at the start
         project_statuses = self.api.user_story_statuses.list(project=self.project.id)
         self.status_map = {s.id: s.name for s in project_statuses}
+        # Shared rate limiter across threads to avoid tripping firewall
+        self._rate_lock = threading.Lock()
+        self._last_call_ts = 0.0
+        self._min_interval = 0.6  # seconds between history calls (safe-ish)
     
     def fetch_single_story_data(self, story):
         """Helper function to fetch history and extract data for one story."""
@@ -22,31 +27,20 @@ class TaigaFetcher:
         history_entries = self._safe_get_story_history(story.id)
         return self._extract_story_data(story, history_entries)
 
-    # def get_all_stories(self):
-    #     """Get all user stories as DataFrame using parallel fetching."""
-    #     stories = self.api.user_stories.list(project=self.project.id, pagination=False)
-        
-    #     # Use ThreadPoolExecutor to fetch history for stories in parallel
-    #     # Adjust max_workers based on your internet/server capacity (5-10 is usually safe)
-    #     with ThreadPoolExecutor(max_workers=3) as executor:
-    #         results = list(executor.map(self.fetch_single_story_data, stories))
-        
-        # return pd.DataFrame(results)
-    
-
     def get_all_stories(self):
+        """Get all user stories as DataFrame using safer parallel fetching."""
         stories = self.api.user_stories.list(project=self.project.id, pagination=False)
         results = []
-        # Use a slower pace. 1.0 second is very safe for 34 cards.
-        # Total time: 34 seconds, but it won't crash your app for 12 hours.
-        my_bar = st.progress(0, text="Bypassing Firewall protection...")
-        
-        for i, story in enumerate(stories):
-            time.sleep(1.0) # Human-like delay
-            data = self.fetch_single_story_data(story)
-            results.append(data)
-            my_bar.progress((i + 1) / len(stories))
-            
+        my_bar = st.progress(0, text="Fetching stories (safe parallel mode)...")
+
+        # Conservative concurrency to reduce firewall triggers
+        max_workers = 2
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {executor.submit(self.fetch_single_story_data, s): s for s in stories}
+            for i, future in enumerate(as_completed(future_map)):
+                results.append(future.result())
+                my_bar.progress((i + 1) / len(stories))
+
         my_bar.empty()
         return pd.DataFrame(results)
 
@@ -54,6 +48,13 @@ class TaigaFetcher:
         attempts = 0
         while True:
             try:
+                # Global rate limit across threads
+                with self._rate_lock:
+                    now = time.time()
+                    wait_for = self._min_interval - (now - self._last_call_ts)
+                    if wait_for > 0:
+                        time.sleep(wait_for + random.random() * 0.2)
+                    self._last_call_ts = time.time()
                 return self.api.history.user_story.get(story_id)
             except Exception as e:
                 err = str(e).lower()
